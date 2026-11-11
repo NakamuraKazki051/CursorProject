@@ -5,6 +5,11 @@ desktop.ini
 .vscode/
 .idea/
 
+# アプリ（それぞれ別の GitHub リポジトリで管理している）
+/TaskManagement/
+/IncomeandExpenceManagement/
+/RaiseLine/
+
 # Logs / temp
 *.log
 tmp/
