@@ -15,7 +15,7 @@ Cursor（と Claude Code）で作った3つの Web アプリをまとめたフ�
 | API | Java 25 + Spring Boot 4.1 | Ruby 4.0 + Rails 8.1 | Java 25 + Spring Boot 4.1 |
 | データベース | PostgreSQL 16 | MySQL 8.4 | MySQL 8.4 |
 | ローカルで開く URL | http://localhost:8080/ | http://localhost:8080/ | http://localhost:5173/（開発中）・http://localhost:8080/ |
-| AWS | EC2 + RDS（Terraform） | EC2 + RDS（Terraform） | CloudFront + EC2 + RDS + S3（Terraform） |
+| AWS | CloudFront + EC2 + RDS（Terraform） | CloudFront + EC2 + RDS（Terraform） | CloudFront + EC2 + RDS + S3（Terraform） |
 
 3つとも、ブラウザから Cookie でログインし、データはサーバーの DB に保存します。ローカルでは DB を Docker で動かし、AWS には使うときだけ環境を作って、使い終わったら消します。
 
@@ -130,10 +130,11 @@ cd frontend; npm install; npm run dev   # 画面（http://localhost:5173 を開�
 
 - **テスト：**
   - どのアプリも API の自動テストがあります（タスク管理は JUnit、収支管理は Rails のテスト）。
-  - RaiseLine は画面のテスト（Vitest）と、Playwright による結合テストもあります。PR を出すたびに GitHub Actions がテストを動かし、通ってからマージします。
+  - RaiseLine は画面のテスト（Vitest）と、Playwright による結合テストもあります。
+  - 3つとも、PR を出すたびに GitHub Actions がテストを動かし、通ってからマージします。
 - **性能テスト：** `perf/` に k6 のシナリオがあり、たくさんのデータを入れて速さを確かめられます。
 - **AWS：**
-  - `infra/terraform/` に、無料枠の範囲で環境を作る設定があります。
+  - `infra/terraform/` に、無料枠の範囲で環境を作る設定があります。3つとも CloudFront で HTTPS にしています。
   - 使うときだけ作り、終わったら消して費用を抑えます。
 - **このPCで使うときの注意：**
   - メモリが少ないので、Docker Desktop は必要なときだけ起動します。
@@ -145,6 +146,8 @@ cd frontend; npm install; npm run dev   # 画面（http://localhost:5173 を開�
 
 3つのアプリのコード・テスト・AWS の設定を読んで、良いところと気になるところをまとめました。
 
+> **2026-11-18 更新：** 優先順位 1〜3（タスク管理のログイン回数制限、前の2つの CI、前の2つの HTTPS）は直しました。直したところは ~~取り消し線~~ と ✅ で示しています。
+
 ### ひと目で比べる
 
 | | タスク管理 | 収支管理 | RaiseLine |
@@ -153,9 +156,9 @@ cd frontend; npm install; npm run dev   # 画面（http://localhost:5173 を開�
 | コミット数 | 79 | 122 | 109 |
 | API のテスト | ○（JUnit 11 ファイル） | ○（Rails 12 ファイル） | ◎（同時実行・WebSocket まで） |
 | 画面のテスト | ×（なし） | ×（なし） | ○（Vitest） |
-| 結合テスト・CI | × | × | ◎（Playwright + GitHub Actions） |
-| ログインの守り | ○ | ◎（試行回数の上限あり） | ◎（メール確認・2段階認証・端末管理） |
-| AWS の通信 | HTTP（80 番） | HTTP（80 番） | HTTPS（CloudFront） |
+| 結合テスト・CI | ○（CI あり ✅） | ○（CI あり ✅） | ◎（Playwright + GitHub Actions） |
+| ログインの守り | ◎（試行回数の上限あり ✅） | ◎（試行回数の上限あり） | ◎（メール確認・2段階認証・端末管理） |
+| AWS の通信 | HTTPS（CloudFront ✅） | HTTPS（CloudFront ✅） | HTTPS（CloudFront） |
 | ドキュメント | ○（要件・図） | ○（要件・図） | ◎（要件・仕様・API 仕様書の自動生成） |
 
 （◎ とても良い　○ 良い　× まだない）
@@ -170,13 +173,14 @@ cd frontend; npm install; npm run dev   # 画面（http://localhost:5173 を開�
 
 **気になるところ**
 - 画面のコードが `app.js` の1ファイル（約1,560行、関数90個）に集まっていて、直す場所を探しにくくなっています。
-- 画面の自動テストと CI がないので、画面を直したときの壊れに気づきにくいです。
-- ログインの試行回数に上限がありません。収支管理にはあります。
-- AWS では HTTP で配信しているので、通信が暗号化されません。
+- 画面の自動テストがないので、画面を直したときの壊れに気づきにくいです（CI では文法チェックだけ動かしています）。
+- ~~CI がありません。~~ ✅ PR ごとに API のテストと画面の文法チェックが動くようになりました。
+- ~~ログインの試行回数に上限がありません。~~ ✅ 同じメールアドレスへのログインを5分間に10回までにしました。
+- ~~AWS では HTTP で配信しているので、通信が暗号化されません。~~ ✅ CloudFront で HTTPS にしました。
 
 **次の一手**
-- ログインの回数制限を、収支管理と同じように入れる。
-- GitHub Actions で `mvn test` を PR ごとに動かす。
+- ~~ログインの回数制限を、収支管理と同じように入れる。~~ ✅
+- ~~GitHub Actions で `mvn test` を PR ごとに動かす。~~ ✅
 - `app.js` を「ボード」「タスク」「API 通信」などのファイルに分ける。
 
 ### 2. 収支管理アプリ
@@ -188,12 +192,13 @@ cd frontend; npm install; npm run dev   # 画面（http://localhost:5173 を開�
 - 予定と実績・予算・レポートと、家計簿として必要なものが一通りそろっています。
 
 **気になるところ**
-- 画面（Next.js）の自動テストと CI がありません。
-- タスク管理と同じく、AWS は HTTP 配信です。
+- 画面（Next.js）の自動テストがありません（CI では型チェック・lint・ビルドを動かしています）。
+- ~~CI がありません。~~ ✅ PR ごとに Rails のテストと画面の型チェック・lint・ビルドが動くようになりました。
+- ~~タスク管理と同じく、AWS は HTTP 配信です。~~ ✅ CloudFront で HTTPS にしました。
 - Ruby・Node.js・MySQL を手で入れる必要があり、動かすまでの手順が3つの中で一番多いです。
 
 **次の一手**
-- GitHub Actions で Rails のテストを PR ごとに動かす。
+- ~~GitHub Actions で Rails のテストを PR ごとに動かす。~~ ✅
 - 金額の計算など大事な画面の部品に、テストを足す。
 
 ### 3. RaiseLine
@@ -221,7 +226,8 @@ cd frontend; npm install; npm run dev   # 画面（http://localhost:5173 を開�
 
 - 3つは「**素の JS（タスク管理）→ Next.js + Rails（収支管理）→ React + Spring Boot の本格 SNS（RaiseLine）**」と、順に技術と品質の段が上がっています。
 - RaiseLine で身についた「CI・画面のテスト・HTTPS」を前の2つに戻すと、3つとも同じ水準になります。
-- 優先して直したいのは次の3つです。
-  1. タスク管理にログインの回数制限を入れる
-  2. 前の2つに CI を入れる
-  3. 前の2つを HTTPS にする
+- 優先して直したい3つは、すべて直しました。
+  1. ✅ タスク管理にログインの回数制限を入れる
+  2. ✅ 前の2つに CI を入れる
+  3. ✅ 前の2つを HTTPS にする（AWS ではまだ動かしていないので、次に立ち上げたときに確かめる）
+- 次は、前の2つの画面のテストと、AWS での確認です。
